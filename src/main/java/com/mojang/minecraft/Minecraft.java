@@ -40,11 +40,15 @@ import static org.lwjgl.system.MemoryUtil.*;
 
 public class Minecraft implements Runnable {
     public static final String VERSION_STRING = "0.0.11a";
+    private static Minecraft minecraft;
+    private final FloatBuffer fogColor0 = BufferUtils.createFloatBuffer(4);
+    private final FloatBuffer fogColor1 = BufferUtils.createFloatBuffer(4);
+    private final IntBuffer viewportBuffer = BufferUtils.createIntBuffer(16);
+    private final IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
+    private Canvas parent;
     private boolean fullscreen = false;
     private int width;
     private int height;
-    private FloatBuffer fogColor0 = BufferUtils.createFloatBuffer(4);
-    private FloatBuffer fogColor1 = BufferUtils.createFloatBuffer(4);
     private Timer timer = new Timer(20.0F);
     private Level level;
     private LevelRenderer levelRenderer;
@@ -52,29 +56,31 @@ public class Minecraft implements Runnable {
     private int paintTexture = 1;
     private ParticleEngine particleEngine;
     private ArrayList<Entity> entities = new ArrayList();
-    private Canvas parent;
-    public boolean appletMode = false;
-    public volatile boolean pause = false;
     private int yMouseAxis = -1;
-    public Textures textures;
     private Font font;
     private int editMode = 0;
     private volatile boolean running = false;
     private String fpsString = "";
     private boolean mouseGrabbed = false;
-    private IntBuffer viewportBuffer = BufferUtils.createIntBuffer(16);
-    private IntBuffer selectBuffer = BufferUtils.createIntBuffer(2000);
     private HitResult hitResult = null;
-    private long window;
     private float xo;
     private float yo;
+    public Options options;
+    public Textures textures;
+    public volatile boolean pause = false;
+    long window;
     FloatBuffer lb = BufferUtils.createFloatBuffer(16);
+
+    public static Minecraft getInstance() {
+        return minecraft;
+    }
 
     public Minecraft(Canvas parent, int width, int height, boolean fullscreen) {
         this.parent = parent;
         this.width = width;
         this.height = height;
         this.fullscreen = fullscreen;
+        this.options = new Options(this);
         this.textures = new Textures();
     }
 
@@ -149,8 +155,12 @@ public class Minecraft implements Runnable {
 
     private void handleCallbackSet(long handle) {
         glfwSetKeyCallback(handle, (window, key, scancode, action, mods) -> {
-            if (key == GLFW_KEY_ENTER && action == GLFW_PRESS)
+            if (key == options.keySave.key() && action == GLFW_PRESS)
                 this.level.save();
+            if (key == options.keyReset.key() && action == GLFW_PRESS)
+                this.player.resetPos();
+            if (key > GLFW_KEY_0 && key < GLFW_KEY_7 && action == GLFW_PRESS)
+                this.paintTexture = key - GLFW_KEY_0;
             if (key == GLFW_KEY_G && action == GLFW_PRESS)
                 this.entities.add(new Zombie(this.level, this.textures, this.player.x, this.player.y, this.player.z));
         });
@@ -585,7 +595,7 @@ public class Minecraft implements Runnable {
     }
 
     public static void main(String[] args) throws IOException {
-        Minecraft minecraft = new Minecraft((Canvas)null, 854, 480, false);
+        Minecraft.minecraft = new Minecraft((Canvas)null, 854, 480, false);
         (new Thread(minecraft)).start();
     }
 }
