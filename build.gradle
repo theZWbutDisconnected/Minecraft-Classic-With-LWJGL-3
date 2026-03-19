@@ -1,0 +1,21 @@
+plugins {
+    id 'java'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.lwjgl:lwjgl:3.4.1'
+    implementation 'org.lwjgl:lwjgl-opengl:3.4.1'
+    implementation 'org.lwjgl:lwjgl-glfw:3.4.1'
+    implementation("org.joml:joml:1.10.8")
+}
+
+test {
+    useJUnitPlatform()
+}
