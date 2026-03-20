@@ -100,7 +100,7 @@ public class Minecraft implements Runnable {
             throw new IllegalStateException("Unable to initialize GLFW");
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-        window = glfwCreateWindow(width, height, "Hello World!", NULL, NULL);
+        window = glfwCreateWindow(width, height, "Minecraft", NULL, NULL);
         if (window == NULL)
             throw new RuntimeException("Failed to create the GLFW window");
         handleCallbackSet(window);
