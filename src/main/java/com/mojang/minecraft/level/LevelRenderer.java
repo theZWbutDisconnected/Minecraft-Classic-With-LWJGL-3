@@ -17,11 +17,12 @@ import java.util.Collections;
 import java.util.List;
 import org.lwjgl.opengl.GL11;
 
+import static com.mojang.minecraft.level.Chunk.CHUNK_SIZE;
+
 public class LevelRenderer implements LevelListener {
     public static final int MAX_REBUILDS_PER_FRAME = 8;
-    public static final int CHUNK_SIZE = 16;
     private Level level;
-    private Chunk[] chunks;
+    private ChunkRenderer[] chunks;
     private int xChunks;
     private int yChunks;
     private int zChunks;
@@ -31,20 +32,20 @@ public class LevelRenderer implements LevelListener {
         this.level = level;
         this.textures = textures;
         level.addListener(this);
-        this.xChunks = level.width / 16;
-        this.yChunks = level.depth / 16;
-        this.zChunks = level.height / 16;
-        this.chunks = new Chunk[this.xChunks * this.yChunks * this.zChunks];
+        this.xChunks = level.width / CHUNK_SIZE;
+        this.yChunks = level.depth / CHUNK_SIZE;
+        this.zChunks = level.height / CHUNK_SIZE;
+        this.chunks = new ChunkRenderer[this.xChunks * this.yChunks * this.zChunks];
 
         for(int x = 0; x < this.xChunks; ++x) {
             for(int y = 0; y < this.yChunks; ++y) {
                 for(int z = 0; z < this.zChunks; ++z) {
-                    int x0 = x * 16;
-                    int y0 = y * 16;
-                    int z0 = z * 16;
-                    int x1 = (x + 1) * 16;
-                    int y1 = (y + 1) * 16;
-                    int z1 = (z + 1) * 16;
+                    int x0 = x * CHUNK_SIZE;
+                    int y0 = y * CHUNK_SIZE;
+                    int z0 = z * CHUNK_SIZE;
+                    int x1 = (x + 1) * CHUNK_SIZE;
+                    int y1 = (y + 1) * CHUNK_SIZE;
+                    int z1 = (z + 1) * CHUNK_SIZE;
                     if (x1 > level.width) {
                         x1 = level.width;
                     }
@@ -57,18 +58,18 @@ public class LevelRenderer implements LevelListener {
                         z1 = level.height;
                     }
 
-                    this.chunks[(x + y * this.xChunks) * this.zChunks + z] = new Chunk(level, x0, y0, z0, x1, y1, z1);
+                    this.chunks[(x + y * this.xChunks) * this.zChunks + z] = new ChunkRenderer(level, x0, y0, z0, x1, y1, z1);
                 }
             }
         }
 
     }
 
-    public List<Chunk> getAllDirtyChunks() {
-        ArrayList<Chunk> dirty = null;
+    public List<ChunkRenderer> getAllDirtyChunks() {
+        ArrayList<ChunkRenderer> dirty = null;
 
         for(int i = 0; i < this.chunks.length; ++i) {
-            Chunk chunk = this.chunks[i];
+            ChunkRenderer chunk = this.chunks[i];
             if (chunk.isDirty()) {
                 if (dirty == null) {
                     dirty = new ArrayList();
@@ -97,12 +98,12 @@ public class LevelRenderer implements LevelListener {
     }
 
     public void updateDirtyChunks(Player player) {
-        List<Chunk> dirty = this.getAllDirtyChunks();
+        List<ChunkRenderer> dirty = this.getAllDirtyChunks();
         if (dirty != null) {
             Collections.sort(dirty, new DirtyChunkSorter(player, Frustum.getFrustum()));
 
             for(int i = 0; i < 8 && i < dirty.size(); ++i) {
-                ((Chunk)dirty.get(i)).rebuild();
+                ((ChunkRenderer)dirty.get(i)).rebuild();
             }
 
         }
@@ -166,7 +167,7 @@ public class LevelRenderer implements LevelListener {
             t.init();
 
             for(int i = 0; i < 6; ++i) {
-                Tile.rock.renderFaceNoTexture(t, h.x, h.y, h.z, i);
+                Tile.rock.renderFaceNoTexture(t, h.x(), h.y(), h.z(), i);
             }
 
             t.flush();
@@ -177,30 +178,30 @@ public class LevelRenderer implements LevelListener {
             GL11.glEnable(3553);
             int id = this.textures.loadTexture("/terrain.png", 9728);
             GL11.glBindTexture(3553, id);
-            int x = h.x;
-            int y = h.y;
-            int z = h.z;
-            if (h.f == 0) {
+            int x = h.x();
+            int y = h.y();
+            int z = h.z();
+            if (h.face() == 0) {
                 --y;
             }
 
-            if (h.f == 1) {
+            if (h.face() == 1) {
                 ++y;
             }
 
-            if (h.f == 2) {
+            if (h.face() == 2) {
                 --z;
             }
 
-            if (h.f == 3) {
+            if (h.face() == 3) {
                 ++z;
             }
 
-            if (h.f == 4) {
+            if (h.face() == 4) {
                 --x;
             }
 
-            if (h.f == 5) {
+            if (h.face() == 5) {
                 ++x;
             }
 
@@ -216,12 +217,12 @@ public class LevelRenderer implements LevelListener {
     }
 
     public void setDirty(int x0, int y0, int z0, int x1, int y1, int z1) {
-        x0 /= 16;
-        x1 /= 16;
-        y0 /= 16;
-        y1 /= 16;
-        z0 /= 16;
-        z1 /= 16;
+        x0 /= CHUNK_SIZE;
+        x1 /= CHUNK_SIZE;
+        y0 /= CHUNK_SIZE;
+        y1 /= CHUNK_SIZE;
+        z0 /= CHUNK_SIZE;
+        z1 /= CHUNK_SIZE;
         if (x0 < 0) {
             x0 = 0;
         }
@@ -256,12 +257,18 @@ public class LevelRenderer implements LevelListener {
 
     }
 
-    public void tileChanged(int x, int y, int z) {
-        this.setDirty(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
+    public void tileChanged(Chunk chunk, int x, int y, int z) {
+        int x0 = chunk.chunkX * CHUNK_SIZE;
+        int y0 = chunk.chunkY * CHUNK_SIZE;
+        int z0 = chunk.chunkZ * CHUNK_SIZE;
+        this.setDirty(x0 + x - 1, y0 + y - 1, z0 + z - 1, x0 + x + 1, y0 + y + 1, z0 + z + 1);
     }
 
-    public void lightColumnChanged(int x, int z, int y0, int y1) {
-        this.setDirty(x - 1, y0 - 1, z - 1, x + 1, y1 + 1, z + 1);
+    public void lightColumnChanged(Chunk chunk, int x, int z, int y0, int y1) {
+        int xBase = chunk.chunkX * CHUNK_SIZE;
+        int yBase = chunk.chunkY * CHUNK_SIZE;
+        int zBase = chunk.chunkZ * CHUNK_SIZE;
+        this.setDirty(xBase + x - 1, yBase + y0 - 1, zBase + z - 1, xBase + x + 1, yBase + y1 + 1, zBase + z + 1);
     }
 
     public void allChanged() {

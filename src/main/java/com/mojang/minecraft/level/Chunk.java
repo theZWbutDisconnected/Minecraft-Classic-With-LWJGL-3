@@ -1,113 +1,112 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by FernFlower decompiler)
-//
-
 package com.mojang.minecraft.level;
 
-import com.mojang.minecraft.Player;
 import com.mojang.minecraft.level.tile.Tile;
 import com.mojang.minecraft.phys.AABB;
-import com.mojang.minecraft.renderer.Tesselator;
-import org.lwjgl.opengl.GL11;
+
+import java.util.ArrayList;
+import java.util.Random;
 
 public class Chunk {
-    public AABB aabb;
-    public final Level level;
-    public final int x0;
-    public final int y0;
-    public final int z0;
-    public final int x1;
-    public final int y1;
-    public final int z1;
-    public final float x;
-    public final float y;
-    public final float z;
-    private boolean dirty = true;
-    private int lists = -1;
-    public long dirtiedTime = 0L;
-    private static Tesselator t;
-    public static int updates;
-    private static long totalTime;
-    private static int totalUpdates;
+    public static final int TILE_UPDATE_INTERVAL = 400;
+    public static final int CHUNK_SIZE = 16;
+    public int chunkX;
+    public int chunkY;
+    public int chunkZ;
+    public byte[] blocks;
+    private int[] lightDepths;
+    private Level level;
+    private Random random = new Random();
+    int unprocessed = 0;
 
-    static {
-        t = Tesselator.instance;
-        updates = 0;
-        totalTime = 0L;
-        totalUpdates = 0;
-    }
-
-    public Chunk(Level level, int x0, int y0, int z0, int x1, int y1, int z1) {
+    public Chunk(Level level, int chunkX, int chunkY, int chunkZ) {
         this.level = level;
-        this.x0 = x0;
-        this.y0 = y0;
-        this.z0 = z0;
-        this.x1 = x1;
-        this.y1 = y1;
-        this.z1 = z1;
-        this.x = (float)(x0 + x1) / 2.0F;
-        this.y = (float)(y0 + y1) / 2.0F;
-        this.z = (float)(z0 + z1) / 2.0F;
-        this.aabb = new AABB((float)x0, (float)y0, (float)z0, (float)x1, (float)y1, (float)z1);
-        this.lists = GL11.glGenLists(2);
+        this.chunkX = chunkX;
+        this.chunkY = chunkY;
+        this.chunkZ = chunkZ;
+        this.blocks = new byte[CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE];
+        this.lightDepths = new int[CHUNK_SIZE * CHUNK_SIZE];
+        this.calcLightDepths(0, 0, CHUNK_SIZE, CHUNK_SIZE);
     }
 
-    private void rebuild(int layer) {
-        this.dirty = false;
-        ++updates;
-        long before = System.nanoTime();
-        GL11.glNewList(this.lists + layer, 4864);
-        t.init();
-        int tiles = 0;
+    public void calcLightDepths(int x0, int y0, int x1, int y1) {
+        for(int x = x0; x < x0 + x1; ++x) {
+            for(int z = y0; z < y0 + y1; ++z) {
+                int oldDepth = this.lightDepths[x + z * CHUNK_SIZE];
 
-        for(int x = this.x0; x < this.x1; ++x) {
-            for(int y = this.y0; y < this.y1; ++y) {
-                for(int z = this.z0; z < this.z1; ++z) {
-                    int tileId = this.level.getTile(x, y, z);
-                    if (tileId > 0) {
-                        Tile.tiles[tileId].render(t, this.level, layer, x, y, z);
-                        ++tiles;
+                int y;
+                for(y = CHUNK_SIZE - 1; y > 0 && !this.isLightBlocker(x, y, z); --y) {
+                }
+
+                this.lightDepths[x + z * CHUNK_SIZE] = y;
+                if (oldDepth != y) {
+                    int yl0 = oldDepth < y ? oldDepth : y;
+                    int yl1 = oldDepth > y ? oldDepth : y;
+
+                    for(int i = 0; i < this.level.getLevelListeners().size(); ++i) {
+                        ((LevelListener)this.level.getLevelListeners().get(i)).lightColumnChanged(this, x, z, yl0, yl1);
                     }
                 }
             }
         }
 
-        t.flush();
-        GL11.glEndList();
-        long after = System.nanoTime();
-        if (tiles > 0) {
-            totalTime += after - before;
-            ++totalUpdates;
+    }
+
+    public boolean isLightBlocker(int x, int y, int z) {
+        Tile tile = Tile.tiles[this.getTile(x, y, z)];
+        return tile == null ? false : tile.blocksLight();
+    }
+
+    public boolean setTile(int x, int y, int z, int type) {
+        if (x >= 0 && y >= 0 && z >= 0 && x < CHUNK_SIZE && y < CHUNK_SIZE && z < CHUNK_SIZE) {
+            int i1 = (y * CHUNK_SIZE + z) * CHUNK_SIZE + x;
+            if (type == this.blocks[i1]) {
+                return false;
+            } else {
+                this.blocks[i1] = (byte)type;
+                this.calcLightDepths(x, z, 1, 1);
+
+                for(int i = 0; i < this.level.getLevelListeners().size(); ++i) {
+                    ((LevelListener)this.level.getLevelListeners().get(i)).tileChanged(this, x, y, z);
+                }
+
+                return true;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    public boolean isLit(int x, int y, int z) {
+        if (x >= 0 && y >= 0 && z >= 0 && x < CHUNK_SIZE && y < CHUNK_SIZE && z < CHUNK_SIZE) {
+            return y >= this.lightDepths[x + z * CHUNK_SIZE];
+        } else {
+            return true;
+        }
+    }
+
+    public int getTile(int x, int y, int z) {
+        return x >= 0 && y >= 0 && z >= 0 && x < CHUNK_SIZE && y < CHUNK_SIZE && z < CHUNK_SIZE ? this.blocks[(y * CHUNK_SIZE + z) * CHUNK_SIZE + x] : 0;
+    }
+
+    public boolean isSolidTile(int x, int y, int z) {
+        Tile tile = Tile.tiles[this.getTile(x, y, z)];
+        return tile == null ? false : tile.isSolid();
+    }
+
+    public void tick() {
+        this.unprocessed += CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+        int ticks = this.unprocessed / TILE_UPDATE_INTERVAL;
+        this.unprocessed -= ticks * TILE_UPDATE_INTERVAL;
+
+        for(int i = 0; i < ticks; ++i) {
+            int x = this.random.nextInt(CHUNK_SIZE);
+            int y = this.random.nextInt(CHUNK_SIZE);
+            int z = this.random.nextInt(CHUNK_SIZE);
+            Tile tile = Tile.tiles[this.getTile(x, y, z)];
+            if (tile != null) {
+                tile.tick(this.level, x, y, z, this.random);
+            }
         }
 
-    }
-
-    public void rebuild() {
-        this.rebuild(0);
-        this.rebuild(1);
-    }
-
-    public void render(int layer) {
-        GL11.glCallList(this.lists + layer);
-    }
-
-    public void setDirty() {
-        if (!this.dirty) {
-            this.dirtiedTime = System.currentTimeMillis();
-        }
-
-        this.dirty = true;
-    }
-
-    public boolean isDirty() {
-        return this.dirty;
-    }
-
-    public float distanceToSqr(Player player) {
-        float xd = player.x - this.x;
-        float yd = player.y - this.y;
-        float zd = player.z - this.z;
-        return xd * xd + yd * yd + zd * zd;
     }
 }

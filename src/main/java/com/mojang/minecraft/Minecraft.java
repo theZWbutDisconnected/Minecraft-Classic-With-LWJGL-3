@@ -7,7 +7,7 @@ package com.mojang.minecraft;
 
 import com.mojang.minecraft.character.Zombie;
 import com.mojang.minecraft.gui.Font;
-import com.mojang.minecraft.level.Chunk;
+import com.mojang.minecraft.level.ChunkRenderer;
 import com.mojang.minecraft.level.Level;
 import com.mojang.minecraft.level.LevelRenderer;
 import com.mojang.minecraft.level.tile.Tile;
@@ -19,7 +19,6 @@ import com.mojang.minecraft.renderer.Textures;
 
 import java.awt.Canvas;
 import java.awt.Component;
-import java.io.File;
 import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -225,7 +224,8 @@ public class Minecraft implements Runnable {
         try {
             this.init();
         } catch (Exception e) {
-            JOptionPane.showMessageDialog((Component)null, e.toString(), "Failed to start Minecraft", 0);
+            JOptionPane.showMessageDialog((Component)null, e.getStackTrace(), "Failed to start Minecraft: " + e.getMessage(), 0);
+            e.printStackTrace();
             return;
         }
 
@@ -253,8 +253,8 @@ public class Minecraft implements Runnable {
                     ++frames;
 
                     while(System.currentTimeMillis() >= lastTime + 1000L) {
-                        this.fpsString = frames + " fps, " + Chunk.updates + " chunk updates";
-                        Chunk.updates = 0;
+                        this.fpsString = frames + " fps, " + ChunkRenderer.updates + " chunk updates";
+                        ChunkRenderer.updates = 0;
                         lastTime += 1000L;
                         frames = 0;
                     }
@@ -289,37 +289,37 @@ public class Minecraft implements Runnable {
     private void handleMouseClick() {
         if (this.editMode == 0) {
             if (this.hitResult != null) {
-                Tile oldTile = Tile.tiles[this.level.getTile(this.hitResult.x, this.hitResult.y, this.hitResult.z)];
-                boolean changed = this.level.setTile(this.hitResult.x, this.hitResult.y, this.hitResult.z, 0);
+                Tile oldTile = Tile.tiles[this.level.getTile(this.hitResult.x(), this.hitResult.y(), this.hitResult.z())];
+                boolean changed = this.level.setTile(this.hitResult.x(), this.hitResult.y(), this.hitResult.z(), 0);
                 if (oldTile != null && changed) {
-                    oldTile.destroy(this.level, this.hitResult.x, this.hitResult.y, this.hitResult.z, this.particleEngine);
+                    oldTile.destroy(this.level, this.hitResult.x(), this.hitResult.y(), this.hitResult.z(), this.particleEngine);
                 }
             }
         } else if (this.hitResult != null) {
-            int x = this.hitResult.x;
-            int y = this.hitResult.y;
-            int z = this.hitResult.z;
-            if (this.hitResult.f == 0) {
+            int x = this.hitResult.x();
+            int y = this.hitResult.y();
+            int z = this.hitResult.z();
+            if (this.hitResult.face() == 0) {
                 --y;
             }
 
-            if (this.hitResult.f == 1) {
+            if (this.hitResult.face() == 1) {
                 ++y;
             }
 
-            if (this.hitResult.f == 2) {
+            if (this.hitResult.face() == 2) {
                 --z;
             }
 
-            if (this.hitResult.f == 3) {
+            if (this.hitResult.face() == 3) {
                 ++z;
             }
 
-            if (this.hitResult.f == 4) {
+            if (this.hitResult.face() == 4) {
                 --x;
             }
 
-            if (this.hitResult.f == 5) {
+            if (this.hitResult.face() == 5) {
                 ++x;
             }
 

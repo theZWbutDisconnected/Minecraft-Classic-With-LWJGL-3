@@ -9,7 +9,7 @@ import com.mojang.minecraft.Player;
 import com.mojang.minecraft.renderer.Frustum;
 import java.util.Comparator;
 
-public class DirtyChunkSorter implements Comparator<Chunk> {
+public class DirtyChunkSorter implements Comparator<ChunkRenderer> {
     private Player player;
     private Frustum frustum;
     private long now = System.currentTimeMillis();
@@ -19,7 +19,7 @@ public class DirtyChunkSorter implements Comparator<Chunk> {
         this.frustum = frustum;
     }
 
-    public int compare(Chunk c0, Chunk c1) {
+    public int compare(ChunkRenderer c0, ChunkRenderer c1) {
         boolean i0 = this.frustum.isVisible(c0.aabb);
         boolean i1 = this.frustum.isVisible(c1.aabb);
         if (i0 && !i1) {
